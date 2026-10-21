@@ -1,0 +1,9 @@
+# The starting party (up to 5 members), one line per character:
+#   member [class=<word>] [health=<max hp>] [hp=<current hp>] [weapon=<item id>] [armor=<item id>]
+#          [misc1=<item id>] [misc2=<item id>] [misc3=<item id>] <name>
+# Item ids come from items.txt; use - for an empty slot. The name is the rest of the line.
+
+member class=Warrior health=100 weapon=trainingSword armor=trainingArmor Warrior
+member class=Rogue   health=100 weapon=trainingSword armor=trainingArmor Rogue
+member class=Mage    health=100 weapon=trainingSword armor=trainingArmor Mage
+member class=Healer  health=100 weapon=trainingSword armor=trainingArmor Healer

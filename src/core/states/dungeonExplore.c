@@ -1,6 +1,6 @@
 // STATE_DUNGEON_EXPLORE: first-person grid exploration.
 // Owns the loaded map, its tile data, the player and the renderer for as long as it is on the stack.
-// Esc leaves the state (back to whichever menu pushed it).
+// Esc opens the pause menu (party, save, load, leave the dungeon).
 //
 // How interactions work:
 //   1. Each frame findOpportunity() looks at what the player could do right now: the tile they are
@@ -13,14 +13,20 @@
 #include "core/states/dungeonExplore.h"
 
 #include "core/input.h"
+#include "core/save.h"
 #include "core/stateManager.h"
 #include "core/states/battleMain.h"
 #include "core/states/interactPrompt.h"
+#include "core/worldState.h"
 #include "dungeon/interaction.h"
 #include "dungeon/map.h"
 #include "dungeon/mapCatalog.h"
 #include "dungeon/raycaster.h"
 #include "dungeon/tileData.h"
+#include "core/game.h"
+#include "party/inventory.h"
+#include "party/item.h"
+#include "party/party.h"
 #include "player/player.h"
 #include "raylib.h"
 
@@ -42,7 +48,7 @@ typedef struct {
 } Target;
 
 // What the player could do right now (see findOpportunity)
-typedef enum { OPPORTUNITY_NONE, OPPORTUNITY_FACING, OPPORTUNITY_EVENT } OpportunityType;
+typedef enum { OPPORTUNITY_NONE, OPPORTUNITY_FACING, OPPORTUNITY_EVENT, OPPORTUNITY_HEAL } OpportunityType;
 typedef struct {
     OpportunityType type;
     InteractKind kind;  // OPPORTUNITY_FACING
@@ -72,9 +78,57 @@ static struct {
 // door does not immediately reopen the popup.
 static bool waitForRelease = false;
 
+// Where to put the player on the next init instead of the map's start tile (set when loading a save)
+static bool hasStartOverride = false;
+static SaveLocation startOverride;
+
 void dungeonExploreSelectMap(int layer, int mapNumber) {
     currentLayer = layer;
     currentMap = mapNumber;
+    hasStartOverride = false;
+}
+
+void dungeonExploreStartAt(const SaveLocation *location) {
+    currentLayer = location->layer;
+    currentMap = location->map;
+    startOverride = *location;
+    hasStartOverride = true;
+}
+
+bool dungeonExploreGetLocation(SaveLocation *out) {
+    if (!stateManagerIsActive(STATE_DUNGEON_EXPLORE) || map.tiles == NULL) return false;
+    out->layer = currentLayer;
+    out->map = currentMap;
+    out->x = player.gx;
+    out->y = player.gy;
+    playerFacing(&player, &out->dirX, &out->dirY);
+    return true;
+}
+
+// Re-applies what the player already changed on this map: opened chests, discovered skips, once-only events
+// that already happened.
+static void applyWorldState(int layer, int mapNumber, Map *m, TileData *data) {
+    for (int i = 0; i < worldCount(); i++) {
+        const WorldFlag *f = worldAt(i);
+        if (f->layer != layer || f->map != mapNumber) continue;
+
+        switch (f->type) {
+            case WORLD_CHEST_OPENED:
+                if (mapTile(m, f->x, f->y) == T_ITEM) mapSet(m, f->x, f->y, T_CHEST_OPEN);
+                break;
+            case WORLD_SKIP_DISCOVERED: {
+                SkipInfo *skip = tileDataFindSkip(data, f->x, f->y);
+                if (skip) skip->discovered = true;
+                break;
+            }
+            case WORLD_EVENT_FIRED:
+                // the index is only trusted if the data file still has that event at that position
+                if (f->index >= 0 && f->index < data->eventCount && data->events[f->index].x == f->x &&
+                    data->events[f->index].y == f->y)
+                    data->events[f->index].fired = true;
+                break;
+        }
+    }
 }
 
 // Loads a map plus its data file into the given structs. Nothing is changed unless it succeeds.
@@ -98,6 +152,7 @@ static bool loadFloor(int layer, int mapNumber, Map *outMap, TileData *outData) 
 
     *outMap = loaded;
     tileDataLoad(outData, outMap, dataPath);
+    applyWorldState(layer, mapNumber, outMap, outData);
     return true;
 }
 
@@ -116,6 +171,48 @@ static void init(void) {
 
     rcInit(&rc);
     playerInit(&player, &map, startX, startY);
+
+    if (hasStartOverride) { // loaded from a save: stand where the save says, if that is still a walkable cell
+        if (mapWalkable(mapTile(&map, startOverride.x, startOverride.y)))
+            playerPlace(&player, startOverride.x, startOverride.y, startOverride.dirX, startOverride.dirY);
+        hasStartOverride = false;
+    }
+}
+
+// Jumps to a saved location while the state is already running (loading from the pause or game-over menu).
+// The map swap is instant; the caller closes its own menu afterwards.
+static bool jumpToLocation(const SaveLocation *location) {
+    Map newMap;
+    TileData newData;
+    if (!loadFloor(location->layer, location->map, &newMap, &newData)) return false;
+
+    mapFree(&map);
+    tileDataFree(&tileData);
+    map = newMap;
+    tileData = newData;
+    currentLayer = location->layer;
+    currentMap = location->map;
+
+    pending.type = PENDING_NONE;
+    transition.type = TRANSITION_NONE;
+    player.phase = PH_IDLE;
+    player.fade = 0.0f;
+
+    if (mapWalkable(mapTile(&map, location->x, location->y))) {
+        playerPlace(&player, location->x, location->y, location->dirX, location->dirY);
+    } else {
+        int startX, startY;
+        mapFindStart(&map, &startX, &startY);
+        playerPlace(&player, startX, startY, 1, 0);
+    }
+    return true;
+}
+
+bool dungeonExploreLoadLocation(const SaveLocation *location) {
+    if (stateManagerIsActive(STATE_DUNGEON_EXPLORE)) return jumpToLocation(location);
+    dungeonExploreStartAt(location);
+    stateManagerPush(STATE_DUNGEON_EXPLORE);
+    return true;
 }
 
 // --- Stairs: swap to the next/previous map and appear next to the matching staircase ---
@@ -191,7 +288,10 @@ static void executeInteraction(InteractKind kind, Target target) {
                 interactPromptOpen("The wall doesn't budge.", PROMPT_OK);
                 break;
             }
-            if (skip) skip->discovered = true; // from now on it works from both sides
+            if (skip) { // from now on it works from both sides
+                skip->discovered = true;
+                worldMark(WORLD_SKIP_DISCOVERED, currentLayer, currentMap, skip->x, skip->y, 0);
+            }
             transition.type = TRANSITION_CROSS;
             transition.destX = target.tileX + target.dirX;
             transition.destY = target.tileY + target.dirY;
@@ -213,11 +313,17 @@ static void executeInteraction(InteractKind kind, Target target) {
             break;
         }
 
-        case INTERACT_CHEST:
-            player.itemsCollected++;
+        case INTERACT_CHEST: {
+            if (inventoryAdd(DROPPED_ITEM_ID, 1) < 1) {
+                interactPromptOpen("You can't carry any more of these.", PROMPT_OK); // only with INVENTORY_STACK_LIMIT; the chest stays closed
+                break;
+            }
+            const ItemDef *dropped = itemDefFind(DROPPED_ITEM_ID);
             mapSet(&map, target.tileX, target.tileY, T_CHEST_OPEN); // stays in place, drawn open, still blocks you
-            interactPromptOpen(TextFormat("You found an item! (%d collected)", player.itemsCollected), PROMPT_OK);
+            worldMark(WORLD_CHEST_OPENED, currentLayer, currentMap, target.tileX, target.tileY, 0);
+            interactPromptOpen(TextFormat("You found a %s!", dropped ? dropped->name : DROPPED_ITEM_ID), PROMPT_OK);
             break;
+        }
 
         case INTERACT_NONE:
             break;
@@ -234,6 +340,16 @@ static void startBattle(const char *enemyId) {
         TraceLog(LOG_WARNING, "dungeonExplore: no enemy called '%s' (check the data file), using the default", enemyId);
         enemy = enemyDefDefault();
     }
+    if (!enemy) {
+        TraceLog(LOG_ERROR, "dungeonExplore: no enemies are defined, check assets/data/enemies.txt");
+        interactPromptOpen("No enemies are defined. (Check assets/data/enemies.txt.)", PROMPT_OK);
+        return;
+    }
+    if (partyGet()->count == 0) {
+        TraceLog(LOG_ERROR, "dungeonExplore: the party is empty, check assets/data/party.txt");
+        interactPromptOpen("The party is empty. (Check assets/data/party.txt.)", PROMPT_OK);
+        return;
+    }
     battleMainStart(enemy);
 }
 
@@ -248,7 +364,7 @@ static void applyOutcome(const EventOutcome *outcome) {
             startBattle(outcome->text);
             break;
         case OUTCOME_ITEM:
-            player.itemsCollected += outcome->amount;
+            inventoryAdd(DROPPED_ITEM_ID, outcome->amount);
             if (outcome->text[0])
                 interactPromptOpen(outcome->text, PROMPT_OK);
             else
@@ -263,6 +379,8 @@ static void applyOutcome(const EventOutcome *outcome) {
 // The player pressed interact on an event tile
 static void startEvent(void) {
     const EventInfo *event = tileDataRollEvent(&tileData, player.gx, player.gy);
+    if (event && event->once)
+        worldMark(WORLD_EVENT_FIRED, currentLayer, currentMap, event->x, event->y, (int)(event - tileData.events));
     if (!event) {
         interactPromptOpen("You look around but find nothing.", PROMPT_OK);
         return;
@@ -301,11 +419,16 @@ static Opportunity findOpportunity(void) {
     if (kind != INTERACT_NONE)
         return (Opportunity){OPPORTUNITY_FACING, kind, ahead, interactionLabel(kind)};
 
+    if (mapTile(&map, player.gx, player.gy) == T_HEAL)
+        return (Opportunity){OPPORTUNITY_HEAL, INTERACT_NONE, ahead, "Rest"};
+
     if (mapTile(&map, player.gx, player.gy) == T_EVENT && tileDataHasEvent(&tileData, player.gx, player.gy))
         return (Opportunity){OPPORTUNITY_EVENT, INTERACT_NONE, ahead, "Investigate"};
 
     return none;
 }
+
+static void restAtHealingSpot(void);
 
 static void activate(Opportunity opportunity) {
     if (opportunity.type == OPPORTUNITY_FACING) {
@@ -315,7 +438,24 @@ static void activate(Opportunity opportunity) {
         interactPromptOpen(interactionPrompt(opportunity.kind), PROMPT_YES_NO);
     } else if (opportunity.type == OPPORTUNITY_EVENT) {
         startEvent();
+    } else if (opportunity.type == OPPORTUNITY_HEAL) {
+        restAtHealingSpot();
     }
+}
+
+// Standing on a healing spot: everyone (the fallen included) goes back to full health
+static void restAtHealingSpot(void) {
+    const Party *party = partyGet();
+    bool needed = false;
+    for (int i = 0; i < party->count; i++)
+        if (party->members[i].health < party->members[i].maxHealth) needed = true;
+
+    if (!needed) {
+        interactPromptOpen("Everyone is already in perfect health.", PROMPT_OK);
+        return;
+    }
+    partyRestore();
+    interactPromptOpen("A soothing light washes over the party. Everyone is fully healed.", PROMPT_OK);
 }
 
 // The popup above us closed. Act on the answer if there was something waiting for it.
@@ -339,7 +479,7 @@ static void resume(void) {
 
 static void update(float dt) {
     if (player.phase == PH_IDLE && inputBackPressed()) {
-        stateManagerPop();
+        stateManagerPush(STATE_PAUSE_MENU);
         return;
     }
 
@@ -390,7 +530,7 @@ static void draw(void) {
     drawInteractHint(w, h);
 
     DrawText(TextFormat("Layer %d - Map %d", currentLayer, currentMap), 12, 12, 24, WHITE);
-    DrawText(TextFormat("Items: %d", player.itemsCollected), 12, 42, 24, WHITE);
+    DrawText(TextFormat("Items: %d", inventoryItems()), 12, 42, 24, WHITE);
     DrawText("Esc: back", 12, h - 30, 20, (Color){200, 200, 200, 255});
     DrawFPS(w - 90, 8);
 }

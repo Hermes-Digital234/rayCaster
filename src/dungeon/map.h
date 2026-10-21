@@ -9,7 +9,7 @@
 //   purple  = stairs up   (goes to the previous map of the same layer)
 //   orange  = stairs down (goes to the next map of the same layer)
 //   magenta = hidden skip: looks like a wall, can be walked through (see tileData.h for the rules)
-//   green   = healing spot (floor tile only, no effect yet)
+//   green   = healing spot (floor tile; stand on it and interact to heal the party to full)
 //   pink    = random event (floor tile; what happens is defined in the map's data file)
 #ifndef MAP_H
 #define MAP_H

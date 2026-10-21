@@ -1,11 +1,16 @@
 // main.c - window and main loop. Everything else happens inside states.
 #include "core/stateManager.h"
+#include "core/game.h"
 #include "core/states/battleMain.h"
 #include "core/states/devMapSelect.h"
 #include "core/states/dungeonExplore.h"
+#include "core/states/gameOver.h"
 #include "core/states/interactPrompt.h"
 #include "core/states/mainMenu.h"
-#include "party/party.h"
+#include "core/states/pauseMenu.h"
+#include "core/states/saveLoadMenu.h"
+#include "core/states/statusMenu.h"
+#include "core/states/inventoryMenu.h"
 #include "raylib.h"
 #include <stdlib.h>
 #include <time.h>
@@ -29,8 +34,14 @@ int main(void) {
     dungeonExploreRegister();
     interactPromptRegister();
     battleMainRegister();
+    pauseMenuRegister();
+    statusMenuRegister();
+    inventoryMenuRegister();
+    saveLoadMenuRegister();
+    gameOverRegister();
 
-    partyInitDefault(); // hardcoded test party until there is a party-creation screen
+    gameLoadData(); // items and enemies from assets/data
+    gameNewGame();  // the starting party from assets/data/party.txt
 
     stateManagerPush(STATE_MAIN_MENU);
     stateManagerFlush(); // so stateManagerDepth() is accurate before the loop starts

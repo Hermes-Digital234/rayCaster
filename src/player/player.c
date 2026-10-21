@@ -33,7 +33,6 @@ void playerInit(Player *p, const Map *m, int gx, int gy) {
     p->phase = PH_IDLE;
     p->t = 0.0f;
     p->fade = 0.0f;
-    p->itemsCollected = 0;
     p->arrived = false;
 }
 

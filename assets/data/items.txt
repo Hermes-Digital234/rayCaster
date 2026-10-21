@@ -1,0 +1,7 @@
+# Equipment. One item per line:
+#   item <id> <weapon|armor|charm> [damage=<n>] [armor=<n>] <display name>
+# Weapons fit the weapon slot, armor fits the main armor slot or a misc slot, charms fit misc slots only.
+# Armor works as effective health: damage reduction = armor / (armor + 300).
+
+item trainingSword weapon damage=20 Training Sword
+item trainingArmor armor armor=300 Training Armor

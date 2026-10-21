@@ -121,7 +121,6 @@ static void enemyTurn(void) {
 
     if (partyLivingCount(party) == 0) {
         addMessage("The party is wiped out...");
-        addMessage("(Game over is not implemented yet, so the party was restored.)");
         result = RESULT_DEFEAT;
         next = NEXT_END;
     } else {
@@ -141,8 +140,8 @@ static void afterMessages(void) {
             enemyTurn();
             break;
         case NEXT_END:
-            if (result == RESULT_DEFEAT) partyRestore();
-            stateManagerPop();
+            if (result == RESULT_DEFEAT) stateManagerReplace(STATE_GAME_OVER); // the dungeon stays underneath
+            else                         stateManagerPop();
             break;
     }
 }
@@ -241,7 +240,7 @@ static void drawParty(void) {
 
         DrawText(isActing ? ">" : " ", 40, y, 22, gold);
         DrawText(c->name, 62, y, 22, nameColor);
-        DrawText(characterClassName(c->cls), 150, y + 3, 18, dim);
+        DrawText(c->className, 150, y + 3, 18, dim);
         drawBar(250, y + 4, 150, 14, c->health, c->maxHealth, (Color){70, 190, 90, 255});
         DrawText(TextFormat("%d/%d", c->health, c->maxHealth), 410, y, 22, nameColor);
         DrawText(TextFormat("AR %d", characterArmor(c)), 495, y + 3, 18, dim);

@@ -30,7 +30,6 @@ typedef struct {
     float creepX, creepY;             // where the camera drifts to while fading out
 
     float fade;         // 0 = clear, 1 = fully black (draw as a black overlay)
-    int itemsCollected;
 
     bool arrived;  // true for ONE frame after landing on a tile (walking, or fading in)
 } Player;

@@ -2,6 +2,7 @@
 #include "raylib.h" // TraceLog
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
 static StateManager manager;
@@ -11,7 +12,8 @@ static bool registered[STATE_COUNT];
 typedef enum {
     ACTION_PUSH,
     ACTION_POP,
-    ACTION_REPLACE
+    ACTION_REPLACE,
+    ACTION_POP_TO
 } PendingType;
 
 typedef struct {
@@ -99,6 +101,11 @@ static void applyPending(void) {
             case ACTION_PUSH:    doPush(a.state);    break;
             case ACTION_POP:     doPop();            break;
             case ACTION_REPLACE: doReplace(a.state); break;
+            case ACTION_POP_TO:
+                // checked now, not when queued, because earlier queued actions may change the stack
+                if (!stateManagerIsActive(a.state)) break;
+                while (manager.stackTop >= 0 && manager.stack[manager.stackTop] != a.state) doPop();
+                break;
         }
     }
     pendingCount = 0;
@@ -126,6 +133,7 @@ void stateManagerRegister(GameState state, StateHandlers handlers) {
 void stateManagerPush(GameState state)    { queue(ACTION_PUSH, state); }
 void stateManagerPop(void)                { queue(ACTION_POP, STATE_NONE); }
 void stateManagerReplace(GameState state) { queue(ACTION_REPLACE, state); }
+void stateManagerPopTo(GameState state)  { queue(ACTION_POP_TO, state); }
 
 void stateManagerFlush(void) { applyPending(); }
 

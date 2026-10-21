@@ -2,10 +2,10 @@
 #include <stdio.h>
 #include <string.h>
 
-void characterInit(Character *c, const char *name, CharacterClass cls, int maxHealth) {
+void characterInit(Character *c, const char *name, const char *className, int maxHealth) {
     memset(c, 0, sizeof(*c));
     snprintf(c->name, sizeof(c->name), "%s", name);
-    c->cls = cls;
+    snprintf(c->className, sizeof(c->className), "%s", className);
     c->maxHealth = maxHealth;
     c->health = maxHealth;
 }
@@ -33,13 +33,10 @@ bool characterIsAlive(const Character *c) {
     return c->health > 0;
 }
 
-const char *characterClassName(CharacterClass cls) {
-    switch (cls) {
-        case CLASS_WARRIOR: return "Warrior";
-        case CLASS_ROGUE:   return "Rogue";
-        case CLASS_MAGE:    return "Mage";
-        case CLASS_HEALER:  return "Healer";
-        case CLASS_COUNT:   break;
-    }
-    return "";
+int characterHeal(Character *c, int amount) {
+    if (!c || c->health <= 0 || amount <= 0) return 0;
+    int room = c->maxHealth - c->health;
+    int healed = amount < room ? amount : room;
+    c->health += healed;
+    return healed;
 }

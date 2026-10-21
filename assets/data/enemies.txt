@@ -1,0 +1,9 @@
+# Enemies. Enemy lines, each followed by its attack lines:
+#   enemy <id> health=<n> damage=<n> armor=<n> texture=<png path> <display name>
+#   attack <enemyId> [multiplier=<x>] [weight=<n>] <attack name>
+# An attack deals the enemy's damage * multiplier (before the target's armor). Weights decide how often each
+# attack is chosen. The first enemy in this file is the default used when a map names an enemy that does not exist.
+
+enemy basic health=100 damage=10 armor=100 texture=assets/textures/enemies/basic.png Basic Enemy
+attack basic multiplier=1.0 weight=70 Strike
+attack basic multiplier=1.5 weight=30 Heavy Swing

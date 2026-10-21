@@ -1,38 +1,12 @@
 #include "dungeon/tileData.h"
 
+#include "core/textParse.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define LINE_SIZE 512
-
-static char *skipSpaces(char *s) {
-    while (*s == ' ' || *s == '\t') s++;
-    return s;
-}
-
-// Copies the next whitespace-separated word into out and advances the cursor. False at end of line.
-static bool nextToken(char **cursor, char *out, size_t size) {
-    char *s = skipSpaces(*cursor);
-    if (*s == '\0') return false;
-
-    size_t n = 0;
-    while (*s != '\0' && *s != ' ' && *s != '\t') {
-        if (n + 1 < size) out[n++] = *s;
-        s++;
-    }
-    out[n] = '\0';
-    *cursor = s;
-    return true;
-}
-
-static bool parseInt(const char *s, int *out) {
-    char *end;
-    long v = strtol(s, &end, 10);
-    if (end == s || *end != '\0') return false;
-    *out = (int)v;
-    return true;
-}
 
 static bool parseSide(const char *s, Side *out) {
     if (!strcmp(s, "any"))   { *out = SIDE_ANY;   return true; }
@@ -51,8 +25,8 @@ static void warn(const char *path, int lineNumber, const char *message) {
 static void parseSkip(TileData *data, const Map *map, char *rest, const char *path, int lineNumber) {
     char token[64];
     int x, y;
-    if (!nextToken(&rest, token, sizeof(token)) || !parseInt(token, &x) ||
-        !nextToken(&rest, token, sizeof(token)) || !parseInt(token, &y)) {
+    if (!textNextToken(&rest, token, sizeof(token)) || !textParseInt(token, &x) ||
+        !textNextToken(&rest, token, sizeof(token)) || !textParseInt(token, &y)) {
         warn(path, lineNumber, "skip needs two numbers: skip <x> <y>");
         return;
     }
@@ -64,7 +38,7 @@ static void parseSkip(TileData *data, const Map *map, char *rest, const char *pa
     }
 
     Side from = skip->from;
-    while (nextToken(&rest, token, sizeof(token))) {
+    while (textNextToken(&rest, token, sizeof(token))) {
         if (strncmp(token, "from=", 5) == 0 && parseSide(token + 5, &from)) continue;
         warn(path, lineNumber, "unknown or invalid option (expected from=north|east|south|west|any)");
         return;
@@ -77,8 +51,8 @@ static void parseSkip(TileData *data, const Map *map, char *rest, const char *pa
 static int parseEvent(TileData *data, const Map *map, char *rest, const char *path, int lineNumber) {
     char token[64];
     int x, y;
-    if (!nextToken(&rest, token, sizeof(token)) || !parseInt(token, &x) ||
-        !nextToken(&rest, token, sizeof(token)) || !parseInt(token, &y)) {
+    if (!textNextToken(&rest, token, sizeof(token)) || !textParseInt(token, &x) ||
+        !textNextToken(&rest, token, sizeof(token)) || !textParseInt(token, &y)) {
         warn(path, lineNumber, "event needs two numbers: event <x> <y> ...");
         return -1;
     }
@@ -92,15 +66,15 @@ static int parseEvent(TileData *data, const Map *map, char *rest, const char *pa
     bool haveType = false;
     EventType type = EVENT_MESSAGE;
 
-    while (nextToken(&rest, token, sizeof(token))) {
+    while (textNextToken(&rest, token, sizeof(token))) {
         if (strncmp(token, "chance=", 7) == 0) {
-            if (!parseInt(token + 7, &chance) || chance < 0 || chance > 100) {
+            if (!textParseInt(token + 7, &chance) || chance < 0 || chance > 100) {
                 warn(path, lineNumber, "chance must be a number from 0 to 100");
                 return -1;
             }
         } else if (strncmp(token, "once=", 5) == 0) {
             int v;
-            if (!parseInt(token + 5, &v) || (v != 0 && v != 1)) {
+            if (!textParseInt(token + 5, &v) || (v != 0 && v != 1)) {
                 warn(path, lineNumber, "once must be 0 or 1");
                 return -1;
             }
@@ -117,7 +91,7 @@ static int parseEvent(TileData *data, const Map *map, char *rest, const char *pa
         }
     }
 
-    char *text = skipSpaces(rest);
+    char *text = textSkipSpaces(rest);
     if (!haveType || *text == '\0') {
         warn(path, lineNumber, "event needs a type and text: message <text>, battle <group> or ask <question>");
         return -1;
@@ -154,7 +128,7 @@ static void parseOption(TileData *data, int askIndex, char *rest, const char *pa
     }
     *arrow = '\0';
 
-    char *label = skipSpaces(rest);
+    char *label = textSkipSpaces(rest);
     size_t n = strlen(label);
     while (n > 0 && (label[n - 1] == ' ' || label[n - 1] == '\t')) label[--n] = '\0';
     if (*label == '\0') {
@@ -169,9 +143,9 @@ static void parseOption(TileData *data, int askIndex, char *rest, const char *pa
     outcome.chance = 100;
 
     bool haveType = false;
-    while (nextToken(&after, token, sizeof(token))) {
+    while (textNextToken(&after, token, sizeof(token))) {
         if (strncmp(token, "chance=", 7) == 0) {
-            if (!parseInt(token + 7, &outcome.chance) || outcome.chance < 0 || outcome.chance > 100) {
+            if (!textParseInt(token + 7, &outcome.chance) || outcome.chance < 0 || outcome.chance > 100) {
                 warn(path, lineNumber, "chance must be a number from 0 to 100");
                 return;
             }
@@ -194,12 +168,12 @@ static void parseOption(TileData *data, int askIndex, char *rest, const char *pa
     }
 
     if (outcome.type == OUTCOME_ITEM) {
-        if (!nextToken(&after, token, sizeof(token)) || !parseInt(token, &outcome.amount) || outcome.amount < 1) {
+        if (!textNextToken(&after, token, sizeof(token)) || !textParseInt(token, &outcome.amount) || outcome.amount < 1) {
             warn(path, lineNumber, "item needs a count of at least 1: item <count> [text]");
             return;
         }
     }
-    char *text = skipSpaces(after);
+    char *text = textSkipSpaces(after);
     if ((outcome.type == OUTCOME_MESSAGE || outcome.type == OUTCOME_BATTLE) && *text == '\0') {
         warn(path, lineNumber, "this outcome needs text (the message, or the enemy group)");
         return;
@@ -258,11 +232,11 @@ void tileDataLoad(TileData *data, const Map *map, const char *path) {
         while (n > 0 && (line[n - 1] == '\n' || line[n - 1] == '\r' || line[n - 1] == ' ' || line[n - 1] == '\t'))
             line[--n] = '\0';
 
-        char *cursor = skipSpaces(line);
+        char *cursor = textSkipSpaces(line);
         if (*cursor == '\0' || *cursor == '#') continue;
 
         char kind[32];
-        nextToken(&cursor, kind, sizeof(kind));
+        textNextToken(&cursor, kind, sizeof(kind));
 
         if (!strcmp(kind, "option")) {
             parseOption(data, askIndex, cursor, path, lineNumber);

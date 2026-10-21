@@ -30,10 +30,9 @@ typedef enum {
     STATE_STATUS_MENU,
     STATE_MAP_MENU,
     STATE_DIALOGUE,
-    STATE_INTERACT_PROMPT,
+    STATE_INTERACT_PROMPT, // yes/no or OK popup drawn over the dungeon
     STATE_SAVE_LOAD,
 
-    //dev states
     STATE_DEV_MAP_SELECT, // development: pick any map from assets/maps
 
     STATE_LOADING,
@@ -76,6 +75,9 @@ void stateManagerRegister(GameState state, StateHandlers handlers);
 void stateManagerPush(GameState state);
 void stateManagerPop(void);
 void stateManagerReplace(GameState state);
+
+// Pops states until `state` is the top one (it stays). Does nothing if it is not on the stack.
+void stateManagerPopTo(GameState state);
 
 // Apply queued transitions right now. Useful for the very first Push before the main loop.
 void stateManagerFlush(void);
