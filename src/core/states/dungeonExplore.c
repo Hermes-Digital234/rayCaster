@@ -14,6 +14,7 @@
 
 #include "core/input.h"
 #include "core/stateManager.h"
+#include "core/states/battleMain.h"
 #include "core/states/interactPrompt.h"
 #include "dungeon/interaction.h"
 #include "dungeon/map.h"
@@ -225,8 +226,15 @@ static void executeInteraction(InteractKind kind, Target target) {
 
 // --- Events ---
 
-static void showBattlePlaceholder(const char *group) { // until the battle states exist
-    interactPromptOpen(TextFormat("Enemies appear: %s! (battles are not implemented yet)", group), PROMPT_OK);
+// `enemyId` comes from the map data file (`battle <enemyId>`). An unknown id is a data mistake: say so on the
+// terminal and fight the default enemy instead of silently doing nothing.
+static void startBattle(const char *enemyId) {
+    const EnemyDef *enemy = enemyDefFind(enemyId);
+    if (!enemy) {
+        TraceLog(LOG_WARNING, "dungeonExplore: no enemy called '%s' (check the data file), using the default", enemyId);
+        enemy = enemyDefDefault();
+    }
+    battleMainStart(enemy);
 }
 
 static void applyOutcome(const EventOutcome *outcome) {
@@ -237,7 +245,7 @@ static void applyOutcome(const EventOutcome *outcome) {
             interactPromptOpen(outcome->text, PROMPT_OK);
             break;
         case OUTCOME_BATTLE:
-            showBattlePlaceholder(outcome->text);
+            startBattle(outcome->text);
             break;
         case OUTCOME_ITEM:
             player.itemsCollected += outcome->amount;
@@ -265,7 +273,7 @@ static void startEvent(void) {
             interactPromptOpen(event->text, PROMPT_OK);
             break;
         case EVENT_BATTLE:
-            showBattlePlaceholder(event->text);
+            startBattle(event->text);
             break;
         case EVENT_ASK: {
             const char *labels[MAX_EVENT_OPTIONS];

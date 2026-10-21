@@ -4,10 +4,10 @@
 #include "core/input.h"
 #include "core/menuList.h"
 #include "core/stateManager.h"
+#include "core/textWrap.h"
 #include "raylib.h"
 
 #include <stdio.h>
-#include <string.h>
 
 #define PANEL_WIDTH 640
 #define PANEL_MARGIN 24
@@ -88,47 +88,6 @@ static void update(float dt) {
     }
 }
 
-// Bounded copy that always terminates
-static void copyText(char *dst, size_t size, const char *src) {
-    size_t n = strlen(src);
-    if (n >= size) n = size - 1;
-    memcpy(dst, src, n);
-    dst[n] = '\0';
-}
-
-// Word-wraps text into maxWidth. Draws it when `draw` is true. Returns the number of lines.
-static int wrapText(const char *text, int x, int y, int maxWidth, bool draw, Color color) {
-    char line[400] = "";
-    char word[128];
-    int lines = 0;
-    const char *p = text;
-
-    while (*p) {
-        while (*p == ' ') p++;
-        int n = 0;
-        while (*p && *p != ' ' && n < (int)sizeof(word) - 1) word[n++] = *p++;
-        word[n] = '\0';
-        if (n == 0) break;
-
-        char candidate[600]; // big enough for a full line plus one more word
-        if (line[0]) snprintf(candidate, sizeof(candidate), "%s %s", line, word);
-        else         snprintf(candidate, sizeof(candidate), "%s", word);
-
-        if (line[0] && MeasureText(candidate, TEXT_SIZE) > maxWidth) {
-            if (draw) DrawText(line, x, y + lines * LINE_HEIGHT, TEXT_SIZE, color);
-            lines++;
-            copyText(line, sizeof(line), word);
-        } else {
-            copyText(line, sizeof(line), candidate);
-        }
-    }
-    if (line[0]) {
-        if (draw) DrawText(line, x, y + lines * LINE_HEIGHT, TEXT_SIZE, color);
-        lines++;
-    }
-    return lines;
-}
-
 static void drawOption(const char *label, int centerX, int y, bool isSelected) {
     const char *text = isSelected ? TextFormat("> %s <", label) : label;
     Color color = isSelected ? (Color){255, 215, 0, 255} : (Color){170, 170, 185, 255};
@@ -139,7 +98,7 @@ static void draw(void) {
     int w = GetScreenWidth(), h = GetScreenHeight();
     int textWidth = PANEL_WIDTH - 2 * PANEL_MARGIN;
 
-    int lines = wrapText(message, 0, 0, textWidth, false, WHITE);
+    int lines = textWrap(message, 0, 0, textWidth, TEXT_SIZE, LINE_HEIGHT, false, WHITE);
     int optionRows = (kind == PROMPT_CHOICE) ? choiceCount : 1;
     int panelHeight = 2 * PANEL_MARGIN + lines * LINE_HEIGHT + optionRows * OPTION_ROW + 10;
     int panelX = (w - PANEL_WIDTH) / 2;
@@ -148,7 +107,7 @@ static void draw(void) {
     DrawRectangle(panelX - 3, panelY - 3, PANEL_WIDTH + 6, panelHeight + 6, (Color){225, 225, 235, 255});
     DrawRectangle(panelX, panelY, PANEL_WIDTH, panelHeight, (Color){18, 18, 32, 245});
 
-    wrapText(message, panelX + PANEL_MARGIN, panelY + PANEL_MARGIN, textWidth, true, WHITE);
+    textWrap(message, panelX + PANEL_MARGIN, panelY + PANEL_MARGIN, textWidth, TEXT_SIZE, LINE_HEIGHT, true, WHITE);
 
     int optionsY = panelY + PANEL_MARGIN + lines * LINE_HEIGHT + 10;
     int centerX = panelX + PANEL_WIDTH / 2;

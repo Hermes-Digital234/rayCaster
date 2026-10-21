@@ -5,6 +5,7 @@
 #include "core/menuList.h"
 #include "core/stateManager.h"
 #include "core/states/dungeonExplore.h"
+#include "party/party.h"
 
 #include <stddef.h>
 
@@ -28,6 +29,7 @@ static void update(float dt) {
 
     switch (selected) {
         case ITEM_START:
+            partyInitDefault(); // a new game starts with a fresh party
             dungeonExploreSelectMap(1, 1); // layer 1, map 1 until there is a real new-game flow
             stateManagerPush(STATE_DUNGEON_EXPLORE);
             break;

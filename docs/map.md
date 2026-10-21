@@ -142,14 +142,14 @@ event <x> <y> [chance=0-100] [once=0|1] <message|battle|ask> <text>
 | `chance` | Percent chance this event happens when the player interacts (default 100). |
 | `once=1` | It can only happen once per map load. Afterwards the button disappears if nothing else is left on that tile. |
 | `message <text>` | Shows the text in a popup. |
-| `battle <group>` | Starts a battle. Battles do not exist yet, so a placeholder popup shows the group name. |
+| `battle <enemyId>` | Starts a battle with that enemy. The only id so far is `basic`. An unknown id is reported on the terminal and the basic enemy is used instead. Ids are defined in `src/enemies/enemy.c`. |
 | `ask <question>` | Shows the question and a menu of answers (below). |
 
 Several `event` lines on the same tile are tried **in file order**. The first one whose chance roll succeeds happens. If none succeed, the player sees "You look around but find nothing."
 
 ```
 # 40% a battle, otherwise you hear something
-event 12 9 chance=40 battle slimes
+event 12 9 chance=40 battle basic
 event 12 9 message You hear a faint whisper somewhere in the dark.
 ```
 
@@ -163,7 +163,7 @@ option <label> => [chance=0-100] <message|battle|item|nothing> [text]
 
 ```
 event 4 11 once=1 ask You see a bag left behind by another adventurer. Pick it up?
-option Pick it up => chance=25 battle goblins
+option Pick it up => chance=25 battle basic
 option Pick it up => item 1 Inside the bag you find a healing potion.
 option Leave it => message You leave the bag where it lies.
 option Check for traps first => message You find nothing suspicious.
@@ -176,7 +176,7 @@ option Check for traps first => message You find nothing suspicious.
 | Outcome | Result |
 |---------|--------|
 | `message <text>` | Popup with the text. |
-| `battle <group>` | Battle (placeholder for now). |
+| `battle <enemyId>` | Starts a battle with that enemy (see above). |
 | `item <count> [text]` | Adds items to the player and shows the text, or "You received N items." if you leave it out. |
 | `nothing` | Closes the menu, nothing happens. |
 

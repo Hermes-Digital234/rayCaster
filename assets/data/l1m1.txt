@@ -12,7 +12,7 @@
 #   button to start it. Several lines for the same pixel are tried in order, and the first one whose chance
 #   roll succeeds happens (if none does, the player finds nothing).
 #     message <text>   a popup with the text
-#     battle <group>   a battle with that enemy group (placeholder popup for now)
+#     battle <enemyId> a battle with that enemy (the only id so far is: basic)
 #     ask <question>   the question plus a menu; the answers are the option lines right below it
 #
 # option <label> => [chance=0-100] <message|battle|item|nothing> [text]
@@ -20,7 +20,7 @@
 #   outcome for that answer; they are tried in order and the first whose chance succeeds happens, so end
 #   with one that has no chance (it always succeeds).
 #     message <text>       a popup with the text
-#     battle <group>       a battle
+#     battle <enemyId>     a battle
 #     item <count> [text]  gives items, then shows the text (a default one if you leave it out)
 #     nothing              nothing happens
 
@@ -28,13 +28,13 @@
 skip 8 2 from=west
 
 # 40% of the time a battle starts, otherwise you hear something.
-event 12 9 chance=40 battle slimes
+event 12 9 chance=40 battle basic
 event 12 9 message You hear a faint whisper somewhere in the dark.
 
 # A question with answers. Picking up the bag has a 25% chance of an ambush, otherwise you get the item.
 # It can only happen once per map load.
 event 4 11 once=1 ask You see a bag left behind by another adventurer. Pick it up?
-option Pick it up => chance=25 battle goblins
+option Pick it up => chance=25 battle basic
 option Pick it up => item 1 Inside the bag you find a healing potion.
 option Leave it => message You leave the bag where it lies.
 option Check for traps first => message You find nothing suspicious. The bag looks safe to pick up.

@@ -16,7 +16,8 @@
 //       one whose chance roll succeeds happens (if none does, they find nothing). chance defaults to 100,
 //       once=1 means it can only happen once per map load.
 //         message <text>   shows the text in a popup
-//         battle <group>   starts a battle with that enemy group (placeholder popup until battles exist)
+//         battle <enemyId> starts a battle with that enemy (ids are in enemies/enemy.c; an unknown id
+//                          is reported on the terminal and the default enemy is used)
 //         ask <question>   shows the question with a menu of options, defined by the option lines below it
 //
 //   option <label> => [chance=<0-100>] <message|battle|item|nothing> [text]
@@ -24,13 +25,13 @@
 //       with the SAME label are the possible outcomes of that answer: they are tried in order and the
 //       first whose chance succeeds happens. A line without chance always succeeds, so put it last.
 //         message <text>       shows the text
-//         battle <group>       starts a battle
+//         battle <enemyId>     starts a battle
 //         item <count> [text]  gives the player items, and shows the text (or a default one)
 //         nothing              nothing happens
 //
 //   Example:
 //       event 4 11 once=1 ask You see a bag left behind by another adventurer. Pick it up?
-//       option Pick it up => chance=25 battle goblins
+//       option Pick it up => chance=25 battle basic
 //       option Pick it up => item 1 Inside the bag you find a healing potion.
 //       option Leave it   => message You leave the bag where it lies.
 //
