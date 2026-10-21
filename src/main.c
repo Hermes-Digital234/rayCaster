@@ -1,55 +1,46 @@
-#include "input.h"
-#include "map.h"
-#include "player.h"
-#include "raycaster.h"
+// main.c - window and main loop. Everything else happens inside states.
+#include "core/stateManager.h"
+#include "core/states/devMapSelect.h"
+#include "core/states/dungeonExplore.h"
+#include "core/states/interactPrompt.h"
+#include "core/states/mainMenu.h"
 #include "raylib.h"
-#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 #define WIN_W 960
 #define WIN_H 600
 
-int main(int argc, char **argv) {
-    const char *path = (argc > 1) ? argv[1] : "map.png";
+int main(void) {
+    // assets/ is copied next to the executable, so run from there no matter where we were launched
+    ChangeDirectory(GetApplicationDirectory());
 
-    Map map;
-    if (!map_load(&map, path)) {
-        fprintf(stderr, "Could not load map image '%s'\n", path);
-        return 1;
-    }
-
-    int startX, startY;
-    if (!map_find_start(&map, &startX, &startY)) {
-        fprintf(stderr, "Map has no white floor tile to start on\n");
-        map_free(&map);
-        return 1;
-    }
-
-    InitWindow(WIN_W, WIN_H, "raycaster - image map");
+    InitWindow(WIN_W, WIN_H, "rpg engine");
     SetTargetFPS(60);
+    SetExitKey(KEY_NULL); // Esc means "back" in the game, not "close the window"
 
-    Raycaster rc;
-    rc_init(&rc);
+    srand((unsigned)time(NULL)); // random events
 
-    Player player;
-    player_init(&player, &map, startX, startY);
+    stateManagerInit();
+    mainMenuRegister();
+    devMapSelectRegister();
+    dungeonExploreRegister();
+    interactPromptRegister();
 
-    while (!WindowShouldClose()) {
-        player_update(&player, &map, input_poll(), GetFrameTime());
+    stateManagerPush(STATE_MAIN_MENU);
+    stateManagerFlush(); // so stateManagerDepth() is accurate before the loop starts
 
-        rc_render(&rc, &map, player.posX, player.posY, player.angle);
+    // The game ends when the window closes or the last state is popped (Quit in the main menu)
+    while (!WindowShouldClose() && stateManagerDepth() > 0) {
+        stateManagerUpdate(GetFrameTime());
 
         BeginDrawing();
         ClearBackground(BLACK);
-        rc_draw(&rc, WIN_W, WIN_H);
-        if (player.fade > 0.0f)
-            DrawRectangle(0, 0, WIN_W, WIN_H, (Color){0, 0, 0, (unsigned char)(player.fade * 255)});
-        DrawText(TextFormat("Items: %d", player.itemsCollected), 12, 12, 24, WHITE);
-        DrawFPS(WIN_W - 90, 8);
+        stateManagerDraw();
         EndDrawing();
     }
 
-    rc_free(&rc);
-    map_free(&map);
+    stateManagerShutdown();
     CloseWindow();
     return 0;
 }

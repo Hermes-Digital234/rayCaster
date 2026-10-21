@@ -70,8 +70,6 @@ def check(path):
         if n > 1:
             notes.append(f"{n} {kind} tiles: the game uses the first one (top-left first) as the arrival point")
 
-    # Reachability from the start. Doors and skips connect the cells on either side of them.
-    # Chests, water and walls block, so a chest in a 1-wide corridor shows up here.
     if walk:
         seen, todo = {walk[0]}, [walk[0]]
         while todo:
@@ -93,7 +91,6 @@ def check(path):
             problems.append(f"{len(lost)} walkable tile(s) cannot be reached from the start, first at {lost[0]} "
                             "(a chest, water or a stair-only connection in the way?)")
 
-    # Data file: positions must point at the right kind of tile
     m = re.match(r"l(\d+)m(\d+)\.png$", os.path.basename(path))
     if m:
         dataPath = os.path.join(os.path.dirname(path), "..", "data", f"l{m.group(1)}m{m.group(2)}.txt")

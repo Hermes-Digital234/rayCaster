@@ -5,18 +5,21 @@
 
 // Colors the map image is matched against
 static const Color palette[T_COUNT] = {
-    [T_FLOOR] = {255, 255, 255, 255},
-    [T_WALL]  = {0, 0, 0, 255},
-    [T_WATER] = {0, 0, 255, 255},
-    [T_ITEM]  = {255, 255, 0, 255},
-    [T_DOOR]  = {255, 0, 0, 255},
-    [T_HEAL]  = {0, 255, 0, 255},
-    [T_EVENT] = {255, 128, 192, 255},
+    [T_FLOOR]       = {255, 255, 255, 255},
+    [T_WALL]        = {0, 0, 0, 255},
+    [T_WATER]       = {0, 0, 255, 255},
+    [T_ITEM]        = {255, 255, 0, 255},
+    [T_DOOR]        = {255, 0, 0, 255},
+    [T_HEAL]        = {0, 255, 0, 255},
+    [T_EVENT]       = {255, 128, 192, 255},
+    [T_STAIRS_UP]   = {128, 0, 255, 255},
+    [T_STAIRS_DOWN] = {255, 165, 0, 255},
+    [T_SKIP]        = {255, 0, 255, 255},
 };
 
 static int classify(Color c) {
     int best = 0, bestD = 1 << 30;
-    for (int i = 0; i < T_COUNT; i++) {
+    for (int i = 0; i < T_CHEST_OPEN; i++) { // T_CHEST_OPEN has no pixel color
         int dr = c.r - palette[i].r, dg = c.g - palette[i].g, db = c.b - palette[i].b;
         int d = dr * dr + dg * dg + db * db;
         if (d < bestD) { bestD = d; best = i; }
@@ -24,7 +27,7 @@ static int classify(Color c) {
     return best;
 }
 
-bool map_load(Map *m, const char *path) {
+bool mapLoad(Map *m, const char *path) {
     Image img = LoadImage(path);
     if (img.data == NULL) return false;
 
@@ -39,35 +42,45 @@ bool map_load(Map *m, const char *path) {
     return true;
 }
 
-void map_free(Map *m) {
+void mapFree(Map *m) {
     free(m->tiles);
     m->tiles = NULL;
     m->w = m->h = 0;
 }
 
-int map_tile(const Map *m, int x, int y) {
+int mapTile(const Map *m, int x, int y) {
     if (x < 0 || y < 0 || x >= m->w || y >= m->h) return T_WALL;
     return m->tiles[y * m->w + x];
 }
 
-void map_set(Map *m, int x, int y, int tile) {
+void mapSet(Map *m, int x, int y, int tile) {
     if (x < 0 || y < 0 || x >= m->w || y >= m->h) return;
     m->tiles[y * m->w + x] = (unsigned char)tile;
 }
 
-bool map_blocks_ray(int tile) { return tile == T_WALL || tile == T_DOOR; }
-
-bool map_walkable(int tile) {
-    return tile == T_FLOOR || tile == T_ITEM || tile == T_HEAL || tile == T_EVENT;
+bool mapBlocksRay(int tile) {
+    return tile == T_WALL || tile == T_DOOR || tile == T_STAIRS_UP || tile == T_STAIRS_DOWN || tile == T_SKIP;
 }
 
-bool map_find_start(const Map *m, int *x, int *y) {
+bool mapWalkable(int tile) {
+    return tile == T_FLOOR || tile == T_HEAL || tile == T_EVENT;
+}
+
+bool mapIsInteractable(int tile) {
+    return tile == T_DOOR || tile == T_STAIRS_UP || tile == T_STAIRS_DOWN || tile == T_SKIP || tile == T_ITEM;
+}
+
+bool mapFindTile(const Map *m, int tile, int *x, int *y) {
     for (int i = 0; i < m->w * m->h; i++) {
-        if (m->tiles[i] == T_FLOOR) {
+        if (m->tiles[i] == tile) {
             *x = i % m->w;
             *y = i / m->w;
             return true;
         }
     }
     return false;
+}
+
+bool mapFindStart(const Map *m, int *x, int *y) {
+    return mapFindTile(m, T_FLOOR, x, y);
 }

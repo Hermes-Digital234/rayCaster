@@ -8,13 +8,12 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_executable(raycaster
-  src/main.c
-  src/map.c
-  src/input.c
-  src/player.c
-  src/raycaster.c
-)
+# Every .c under src/ (new files are picked up automatically on the next build)
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c)
+add_executable(raycaster ${SOURCES})
+
+# Includes are written relative to src/, e.g. #include "core/stateManager.h"
+target_include_directories(raycaster PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_compile_options(raycaster PRIVATE
   $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra>
@@ -36,20 +35,12 @@ if(NOT WIN32)
   target_link_libraries(raycaster PRIVATE m)
 endif()
 
-# Copy the default map next to the executable so it runs from the build folder.
-# Looks in the project root first, then src/. Skipped (with a note) if neither exists.
-set(MAP_IMAGE "")
-foreach(candidate "${CMAKE_CURRENT_SOURCE_DIR}/map.png" "${CMAKE_CURRENT_SOURCE_DIR}/src/map.png")
-  if(NOT MAP_IMAGE AND EXISTS "${candidate}")
-    set(MAP_IMAGE "${candidate}")
-  endif()
-endforeach()
-
-if(MAP_IMAGE)
-  add_custom_command(TARGET raycaster POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${MAP_IMAGE}" $<TARGET_FILE_DIR:raycaster>/map.png
-  )
-else()
-  message(STATUS "map.png not found; pass a map path when running: ./raycaster yourmap.png")
-endif()
+# Copy assets/ next to the executable on EVERY build, even when no code changed,
+# so a new map in assets/maps shows up after a plain `cmake --build .`
+add_custom_target(copyAssets ALL
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+          ${CMAKE_CURRENT_SOURCE_DIR}/assets
+          $<TARGET_FILE_DIR:raycaster>/assets
+)
+# copyAssets runs after raycaster is built (it already depends on it through TARGET_FILE_DIR)
+add_dependencies(copyAssets raycaster)
